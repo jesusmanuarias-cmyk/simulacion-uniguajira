@@ -1,0 +1,4 @@
+Assets/StreamingAssets/Campus/campus.gz filter=lfs diff=lfs merge=lfs -text
+Assets/info/Ch01_nonPBR.fbx filter=lfs diff=lfs merge=lfs -text
+Assets/info/Ch22_nonPBR.fbx filter=lfs diff=lfs merge=lfs -text
+Assets/info/Ch33_nonPBR.fbx filter=lfs diff=lfs merge=lfs -text

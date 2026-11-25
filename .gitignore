@@ -1,0 +1,15 @@
+/Library/
+/Temp/
+/Obj/
+/Logs/
+/UserSettings/
+/Build/
+/Builds/
+/Results/
+/Documentation/*
+!/Documentation/.gitkeep
+*.csproj
+*.sln
+*.user
+*.blend1
+*.request

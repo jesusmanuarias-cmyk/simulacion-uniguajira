@@ -1,0 +1,668 @@
+{
+  "day": "Lunes",
+  "studentsPerRoom": 32,
+  "mainShare": 0.9,
+  "administrators": 12,
+  "adminStart": 480,
+  "adminEnd": 750,
+  "classes": [
+    {
+      "room": "1102",
+      "start": 390,
+      "end": 525,
+      "students": 32,
+      "sourceRow": 2
+    },
+    {
+      "room": "1102",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 3
+    },
+    {
+      "room": "1102",
+      "start": 750,
+      "end": 885,
+      "students": 32,
+      "sourceRow": 4
+    },
+    {
+      "room": "1102",
+      "start": 930,
+      "end": 1065,
+      "students": 32,
+      "sourceRow": 5
+    },
+    {
+      "room": "1102",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 6
+    },
+    {
+      "room": "1103",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 7
+    },
+    {
+      "room": "1103",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 8
+    },
+    {
+      "room": "1103",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 9
+    },
+    {
+      "room": "1103",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 10
+    },
+    {
+      "room": "1103",
+      "start": 1110,
+      "end": 1200,
+      "students": 32,
+      "sourceRow": 11
+    },
+    {
+      "room": "1104",
+      "start": 480,
+      "end": 615,
+      "students": 32,
+      "sourceRow": 12
+    },
+    {
+      "room": "1104",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 13
+    },
+    {
+      "room": "1104",
+      "start": 1020,
+      "end": 1155,
+      "students": 32,
+      "sourceRow": 14
+    },
+    {
+      "room": "1104",
+      "start": 1200,
+      "end": 1335,
+      "students": 32,
+      "sourceRow": 15
+    },
+    {
+      "room": "1105",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 16
+    },
+    {
+      "room": "1105",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 17
+    },
+    {
+      "room": "1105",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 18
+    },
+    {
+      "room": "1105",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 19
+    },
+    {
+      "room": "1105",
+      "start": 1110,
+      "end": 1200,
+      "students": 32,
+      "sourceRow": 20
+    },
+    {
+      "room": "1106",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 21
+    },
+    {
+      "room": "1106",
+      "start": 570,
+      "end": 705,
+      "students": 32,
+      "sourceRow": 22
+    },
+    {
+      "room": "1106",
+      "start": 750,
+      "end": 885,
+      "students": 32,
+      "sourceRow": 23
+    },
+    {
+      "room": "1106",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 24
+    },
+    {
+      "room": "1107",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 25
+    },
+    {
+      "room": "1107",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 26
+    },
+    {
+      "room": "1107",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 27
+    },
+    {
+      "room": "1107",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 28
+    },
+    {
+      "room": "1107",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 29
+    },
+    {
+      "room": "1107",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 30
+    },
+    {
+      "room": "1108",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 31
+    },
+    {
+      "room": "1108",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 32
+    },
+    {
+      "room": "1108",
+      "start": 660,
+      "end": 795,
+      "students": 32,
+      "sourceRow": 33
+    },
+    {
+      "room": "1108",
+      "start": 840,
+      "end": 975,
+      "students": 32,
+      "sourceRow": 34
+    },
+    {
+      "room": "1109",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 35
+    },
+    {
+      "room": "1109",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 36
+    },
+    {
+      "room": "1109",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 37
+    },
+    {
+      "room": "1109",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 38
+    },
+    {
+      "room": "1109",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 39
+    },
+    {
+      "room": "1204",
+      "start": 390,
+      "end": 525,
+      "students": 32,
+      "sourceRow": 40
+    },
+    {
+      "room": "1204",
+      "start": 570,
+      "end": 705,
+      "students": 32,
+      "sourceRow": 41
+    },
+    {
+      "room": "1204",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 42
+    },
+    {
+      "room": "1204",
+      "start": 930,
+      "end": 1065,
+      "students": 32,
+      "sourceRow": 43
+    },
+    {
+      "room": "1204",
+      "start": 1110,
+      "end": 1245,
+      "students": 32,
+      "sourceRow": 44
+    },
+    {
+      "room": "1205",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 45
+    },
+    {
+      "room": "1205",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 46
+    },
+    {
+      "room": "1205",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 47
+    },
+    {
+      "room": "1205",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 48
+    },
+    {
+      "room": "1205",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 49
+    },
+    {
+      "room": "1206",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 50
+    },
+    {
+      "room": "1206",
+      "start": 480,
+      "end": 615,
+      "students": 32,
+      "sourceRow": 51
+    },
+    {
+      "room": "1206",
+      "start": 660,
+      "end": 795,
+      "students": 32,
+      "sourceRow": 52
+    },
+    {
+      "room": "1206",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 53
+    },
+    {
+      "room": "1207",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 54
+    },
+    {
+      "room": "1207",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 55
+    },
+    {
+      "room": "1207",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 56
+    },
+    {
+      "room": "1207",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 57
+    },
+    {
+      "room": "1208",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 58
+    },
+    {
+      "room": "1208",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 59
+    },
+    {
+      "room": "1208",
+      "start": 750,
+      "end": 885,
+      "students": 32,
+      "sourceRow": 60
+    },
+    {
+      "room": "1208",
+      "start": 930,
+      "end": 1065,
+      "students": 32,
+      "sourceRow": 61
+    },
+    {
+      "room": "1208",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 62
+    },
+    {
+      "room": "1303",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 63
+    },
+    {
+      "room": "1303",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 64
+    },
+    {
+      "room": "1303",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 65
+    },
+    {
+      "room": "1303",
+      "start": 840,
+      "end": 930,
+      "students": 32,
+      "sourceRow": 66
+    },
+    {
+      "room": "1303",
+      "start": 1110,
+      "end": 1200,
+      "students": 32,
+      "sourceRow": 67
+    },
+    {
+      "room": "1304",
+      "start": 480,
+      "end": 615,
+      "students": 32,
+      "sourceRow": 68
+    },
+    {
+      "room": "1304",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 69
+    },
+    {
+      "room": "1304",
+      "start": 840,
+      "end": 975,
+      "students": 32,
+      "sourceRow": 70
+    },
+    {
+      "room": "1304",
+      "start": 1020,
+      "end": 1155,
+      "students": 32,
+      "sourceRow": 71
+    },
+    {
+      "room": "1305",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 72
+    },
+    {
+      "room": "1305",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 73
+    },
+    {
+      "room": "1305",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 74
+    },
+    {
+      "room": "1305",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 75
+    },
+    {
+      "room": "1305",
+      "start": 1110,
+      "end": 1200,
+      "students": 32,
+      "sourceRow": 76
+    },
+    {
+      "room": "1306",
+      "start": 570,
+      "end": 705,
+      "students": 32,
+      "sourceRow": 77
+    },
+    {
+      "room": "1306",
+      "start": 750,
+      "end": 885,
+      "students": 32,
+      "sourceRow": 78
+    },
+    {
+      "room": "1306",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 79
+    },
+    {
+      "room": "1307",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 80
+    },
+    {
+      "room": "1307",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 81
+    },
+    {
+      "room": "1307",
+      "start": 660,
+      "end": 750,
+      "students": 32,
+      "sourceRow": 82
+    },
+    {
+      "room": "1307",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 83
+    },
+    {
+      "room": "1307",
+      "start": 930,
+      "end": 1020,
+      "students": 32,
+      "sourceRow": 84
+    },
+    {
+      "room": "1307",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 85
+    },
+    {
+      "room": "1308",
+      "start": 390,
+      "end": 480,
+      "students": 32,
+      "sourceRow": 86
+    },
+    {
+      "room": "1308",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 87
+    },
+    {
+      "room": "1308",
+      "start": 660,
+      "end": 795,
+      "students": 32,
+      "sourceRow": 88
+    },
+    {
+      "room": "1308",
+      "start": 840,
+      "end": 975,
+      "students": 32,
+      "sourceRow": 89
+    },
+    {
+      "room": "1308",
+      "start": 1110,
+      "end": 1200,
+      "students": 32,
+      "sourceRow": 90
+    },
+    {
+      "room": "1309",
+      "start": 480,
+      "end": 570,
+      "students": 32,
+      "sourceRow": 91
+    },
+    {
+      "room": "1309",
+      "start": 570,
+      "end": 660,
+      "students": 32,
+      "sourceRow": 92
+    },
+    {
+      "room": "1309",
+      "start": 750,
+      "end": 840,
+      "students": 32,
+      "sourceRow": 93
+    },
+    {
+      "room": "1309",
+      "start": 1020,
+      "end": 1110,
+      "students": 32,
+      "sourceRow": 94
+    },
+    {
+      "room": "1309",
+      "start": 1200,
+      "end": 1290,
+      "students": 32,
+      "sourceRow": 95
+    }
+  ]
+}
