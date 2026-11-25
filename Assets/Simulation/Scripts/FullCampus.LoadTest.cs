@@ -18,7 +18,8 @@ namespace CampusMonday
         {
             public Seat Seat;
             public Trip Display;
-            public Vector3 Origin, Target, Position, ProgressPoint;
+            public Vector3 Origin, Target, Position, ProgressPoint, Approach;
+            public bool HasApproach;
             public NavMeshAgent Agent;
             public LoadState State;
             public bool CompletePlan;
@@ -99,31 +100,27 @@ namespace CampusMonday
             StartCoroutine(ObserveFullCapacity(buildingFilter));
         }
 
-        IEnumerator ObserveFullCapacity(string buildingFilter, bool focused = false, bool singleBuilding = false)
+        public void TestCampusRoutes()
+        {
+            if (running || checkingLocalAccess) return;
+            StartCoroutine(ObserveFullCapacity(null, reportRoutes:true));
+        }
+
+        IEnumerator ObserveFullCapacity(string buildingFilter, bool focused = false, bool singleBuilding = false, bool reportRoutes = false)
         {
             Restart();
             checkingLocalAccess = true;
             SetPlayer(false);
             SetFloor(0);
 
-            var selection = singleBuilding ? BuildingDestinations(buildingFilter) : focused
+            var selection = reportRoutes ? BuildingTests().SelectMany(BuildingDestinations).ToArray() : singleBuilding ? BuildingDestinations(buildingFilter) : focused
                 ? inventory.seats.Where(seat => seat.building == MainAdministration).Concat(LibraryDestinations()).ToArray()
                 : inventory.seats.Where(seat => buildingFilter == null || seat.building == buildingFilter).ToArray();
             var queues = new List<Queue<LoadPerson>>();
             bool followFirst = buildingFilter != null || focused;
             foreach (var building in selection.GroupBy(seat => seat.building))
             {
-                var points = building.Key == LibraryBuilding ? LibraryOrigins
-                    : AccessPoints.FirstOrDefault(entry => entry.Building == building.Key).Points;
-                if (points == null && building.Key == "Bloque VII")
-                    points = new Vector3[]{new(145,0,-169),new(111,0,-198),new(181,0,-196)};
-                if (points == null && building.Key == "Bloque VIII")
-                    points = new Vector3[]{new(141,0,-218),new(105,0,-243),new(175,0,-243)};
-                if (points == null)
-                {
-                    var site = VisitorBuildings.FirstOrDefault(entry => entry.Building == building.Key);
-                    if (site.Targets != null) points = new[]{site.Origin};
-                }
+                var points = BuildingOrigins(building.Key);
                 bool hasOrigin = PickLoadOrigin(points, building, out var origin);
                 if (!hasOrigin && NavMesh.SamplePosition(entrance, out var gate, 1f, NavMesh.AllAreas))
                 {
@@ -200,6 +197,17 @@ namespace CampusMonday
                     else if (now - person.ReleasedAt > 210)
                         person.State = LoadState.TimedOut;
                     if (person.State == LoadState.Walking) continue;
+                    if(reportRoutes && person.Seat.role != "Visitante de prueba" && person.HasApproach &&
+                       (person.State == LoadState.Stalled || person.State == LoadState.Partial))
+                    {
+                        person.Display.agent = agent;
+                        person.Display.destination = person.Approach;
+                        if(TryRelocateNearSeat(person.Display))
+                        {
+                            person.State = LoadState.Arrived;
+                            person.Position = agent.transform.position;
+                        }
+                    }
                     agent.enabled = false;
                     // Preserve the agent object and rig at the observed endpoint for inspection.
                     active.RemoveAt(i);
@@ -212,18 +220,34 @@ namespace CampusMonday
                 {
                     nextReport = now + 10;
                     File.WriteAllText("Library/campus_occupancy_progress.txt",
-                        $"{loadPeople.Count} asignados, {loadPeople.Count(p => p.State == LoadState.Arrived)} ocupados, {active.Count} caminando, {pending} en espera");
+                        $"{loadPeople.Count} asignados, {loadPeople.Count(p => p.State == LoadState.Arrived)} llegaron, {eligibleStalls} elegibles, {loadPeople.Count(p => p.Display?.relocated == true)} trasladados, {active.Count} caminando, {pending} en espera");
                 }
                 yield return null;
             }
             while (active.Count > 0 || queues.Any(q => q.Count > 0));
 
-            WriteLoadReport(singleBuilding ? $"prueba_edificio_{buildingFilter}.csv" : focused ? "administrativo_principal_biblioteca_rutas.csv"
+            WriteLoadReport(reportRoutes ? "campus_rutas_y_traslados.csv" : singleBuilding ? $"prueba_edificio_{buildingFilter}.csv" : focused ? "administrativo_principal_biblioteca_rutas.csv"
                 : buildingFilter == null ? "campus_aforo_maximo.csv" : "administrativo_principal_rutas.csv");
             checkingLocalAccess = false;
             var testName = singleBuilding ? buildingFilter : "Prueba de aforo";
             message = $"{testName} · {loadPeople.Count(p => p.State == LoadState.Arrived)}/{loadPeople.Count} llegaron · los demás quedan para inspección";
             Debug.Log(message);
+        }
+
+        static Vector3[] BuildingOrigins(string building)
+        {
+            var points = building == LibraryBuilding ? LibraryOrigins
+                    : AccessPoints.FirstOrDefault(entry => entry.Building == building).Points;
+            if (points == null && building == "Bloque VII")
+                    points = new Vector3[]{new(145,0,-169),new(111,0,-198),new(181,0,-196)};
+            if (points == null && building == "Bloque VIII")
+                    points = new Vector3[]{new(141,0,-218),new(105,0,-243),new(175,0,-243)};
+            if (points == null)
+            {
+                    var site = VisitorBuildings.FirstOrDefault(entry => entry.Building == building);
+                    if (site.Targets != null) points = new[]{site.Origin};
+            }
+            return points;
         }
 
         static bool PickLoadOrigin(Vector3[] points, IEnumerable<Seat> seats, out Vector3 origin)
@@ -262,6 +286,8 @@ namespace CampusMonday
                     if (path.status == NavMeshPathStatus.PathComplete)
                     {
                         person.Target = hit.position;
+                        person.Approach = hit.position;
+                        person.HasApproach = true;
                         person.CompletePlan = true;
                         return;
                     }
@@ -273,6 +299,8 @@ namespace CampusMonday
                     if (remaining >= bestRemaining || (person.Origin - end).sqrMagnitude < .25f) continue;
                     bestRemaining = remaining;
                     person.Target = end;
+                    person.Approach = hit.position;
+                    person.HasApproach = true;
                 }
             }
             if (!hasApproach) person.State = LoadState.NoApproach;
@@ -298,7 +326,7 @@ namespace CampusMonday
             obj.transform.position = origin;
             var agent = obj.AddComponent<NavMeshAgent>();
             agent.radius = CampusAgentRadius;
-            agent.height = 1.65f;
+            agent.height = CampusAgentHeight;
             agent.speed = 3.5f;
             agent.acceleration = 10;
             agent.avoidancePriority = 20 + (int)(origin.sqrMagnitude % 60);
@@ -354,7 +382,7 @@ namespace CampusMonday
         {
             string directory = Application.isEditor ? "Documentation" : Application.persistentDataPath;
             using var writer = new StreamWriter(Path.Combine(directory,filename),false,new UTF8Encoding(true));
-            writer.WriteLine("id,tipo,edificio,zona,puesto,resultado,ruta_planeada,origen_x,origen_y,origen_z,puesto_x,puesto_y,puesto_z,fin_ruta_x,fin_ruta_y,fin_ruta_z,posicion_final_x,posicion_final_y,posicion_final_z,metros");
+            writer.WriteLine("id,tipo,edificio,zona,puesto,resultado,ruta_planeada,origen_x,origen_y,origen_z,puesto_x,puesto_y,puesto_z,fin_ruta_x,fin_ruta_y,fin_ruta_z,posicion_final_x,posicion_final_y,posicion_final_z,metros,elegible_traslado,traslado_cercano");
             int id = 0;
             foreach (var person in loadPeople)
             {
@@ -370,13 +398,17 @@ namespace CampusMonday
                     _ => "sin ruta utilizable desde el origen"
                 };
                 string plan = person.CompletePlan ? "completa" : person.Target != person.Origin ? "parcial" : "ninguna";
-                writer.WriteLine(FormattableString.Invariant($"{++id},{Q(seat.role)},{Q(seat.building)},{Q(seat.room)},{Q(seat.name)},{Q(status)},{plan},{CsvPoint(person.Origin)},{CsvPoint(seat.position)},{CsvPoint(person.Target)},{CsvPoint(person.Position)},{person.Distance:F2}"));
+                writer.WriteLine(FormattableString.Invariant($"{++id},{Q(seat.role)},{Q(seat.building)},{Q(seat.room)},{Q(seat.name)},{Q(status)},{plan},{CsvPoint(person.Origin)},{CsvPoint(seat.position)},{CsvPoint(person.Target)},{CsvPoint(person.Position)},{person.Distance:F2},{(person.Display?.relocationEligible == true?"sí":"no")},{(person.Display?.relocated == true?"sí":"no")}"));
             }
         }
 
         static string CsvPoint(Vector3 point) => FormattableString.Invariant($"{point.x:F3},{point.y:F3},{point.z:F3}");
     }
 }
+
+
+
+
 
 
 

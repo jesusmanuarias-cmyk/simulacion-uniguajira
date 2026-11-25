@@ -15,9 +15,19 @@ namespace CampusMonday {
 public partial class FullCampus : MonoBehaviour {
     [Serializable] public class Seat { public string building,name,role,room; public Vector3 position,forward; }
     [Serializable] public class Inventory { public Seat[] seats; public Vector3 entrance; public int chunks,objects,triangles; }
-    const float CampusAgentRadius=.18f;
+    const float CampusAgentRadius=.14f;
+    const float CampusAgentHeight=1.58f;
+    const float CampusAgentClimb=.34f;
+    const float PlayerRadius=.18f;
+    const float PlayerHeight=1.68f;
+    const float PlayerStep=.32f;
+    const float PlayerFootOffset=.015f;
     class Trip {
         public Seat seat;
+        public Vector3[] actualRoute, tour;
+        public Vector3 origin, exit, destination;
+        public bool toured, relocated, relocationEligible;
+        public Vector3 beforeRelocation;
         public Vector3[] route; public string routeStatus; public Vector3 partialEnd;
         public int phase,corner;
         public Vector3 visualOffset; public float entered,sat,left,ended,meters,stalled; public int retries;
@@ -38,9 +48,12 @@ public partial class FullCampus : MonoBehaviour {
         var person=new GameObject("Jugador");person.layer=2;person.transform.position=entrance+Vector3.up*.03f;
         var rig=Instantiate(characters[0],person.transform);rig.transform.localPosition=Vector3.zero;
         var rs=rig.GetComponentsInChildren<Renderer>();var box=rs[0].bounds;foreach(var r in rs)box.Encapsulate(r.bounds);
-        rig.transform.localScale*=1.75f/box.size.y;box=rs[0].bounds;foreach(var r in rs)box.Encapsulate(r.bounds);
+        rig.transform.localScale*=PlayerHeight/box.size.y;box=rs[0].bounds;foreach(var r in rs)box.Encapsulate(r.bounds);
         rig.transform.position-=new Vector3(box.center.x-person.transform.position.x,box.min.y-person.transform.position.y,box.center.z-person.transform.position.z);
-        var body=person.AddComponent<CharacterController>();body.radius=.22f;body.height=1.75f;body.center=Vector3.up*.89f;body.stepOffset=.29f;
+        var body=person.AddComponent<CharacterController>();
+        body.radius=PlayerRadius;body.height=PlayerHeight;
+        body.center=Vector3.up*(PlayerHeight*.5f+PlayerFootOffset);
+        body.skinWidth=.025f;body.stepOffset=PlayerStep;
         player=person.AddComponent<CampusPlayer>();player.campus=this;player.visual=rig.transform;player.animator=rig.GetComponent<Animator>();
         player.animator.runtimeAnimatorController=playerAnimations;player.animator.applyRootMotion=false;
         foreach(var t in trips.Where(x=>x.route!=null)){
@@ -80,7 +93,8 @@ public partial class FullCampus : MonoBehaviour {
                 if (!Physics.Raycast(navPoint.position + Vector3.up * .55f, Vector3.down, out var floor, 1.15f,
                     mask, QueryTriggerInteraction.Ignore) || floor.normal.y < .7f) continue;
                 var feet = floor.point + Vector3.up * .035f;
-                if (Physics.CheckCapsule(feet + Vector3.up * .23f, feet + Vector3.up * 1.53f, .22f,
+                if (Physics.CheckCapsule(feet + Vector3.up * (PlayerFootOffset+PlayerRadius),
+                    feet + Vector3.up * (PlayerFootOffset+PlayerHeight-PlayerRadius), PlayerRadius,
                     mask, QueryTriggerInteraction.Ignore)) continue;
                 position = feet;
                 return true;
@@ -117,8 +131,12 @@ public partial class FullCampus : MonoBehaviour {
     Vector3 entrance;
     public Bounds bounds;
     string summary,message;
-    int next,finished;
+    int next,finished,eligibleStalls;
     bool running;
+    Trip[] spawnOrder;
+    readonly Dictionary<string, Vector3> buildingOrigins = new Dictionary<string, Vector3>();
+    readonly Dictionary<Vector3, Vector3> exteriorExits = new Dictionary<Vector3, Vector3>();
+    readonly Dictionary<Vector3, Vector3[]> exteriorTours = new Dictionary<Vector3, Vector3[]>();
     bool paused;
     float rate=1;
     Material mapMaterial;
@@ -132,7 +150,7 @@ public partial class FullCampus : MonoBehaviour {
     public string Clock=>TimeSpan.FromSeconds(6*3600+28*60+elapsed).ToString(@"hh\:mm\:ss");
     public string PlayerPrompt=>player?player.InteractionPrompt:"";
     public int Floor { get; private set; }
-    public int MaxFloor=>Mathf.Max(1,Mathf.FloorToInt(inventory.seats.Max(s=>s.position.y)/3.3f)+1);
+    public int MaxFloor=>FloorCuts.Max(block=>block.Cuts.Length);
     public int Capacity(string role)=>capacity.TryGetValue(role,out int count)?count:0;
     Dictionary<string,int> capacity;
     public void ToggleRun(){
@@ -140,10 +158,13 @@ public partial class FullCampus : MonoBehaviour {
         if(running){paused=!paused;return;}
         if(Started)Restart();
         else ClearLoadPeople();
+        spawnOrder=trips.GroupBy(t=>t.seat.building)
+            .SelectMany(group=>group.Select((trip,index)=>(trip,index)))
+            .OrderBy(item=>item.index).Select(item=>item.trip).ToArray();
         running=true;
     }
     public void SetRate(float value){rate=value;}
-    public void SetFloor(int floor){Floor=floor;mapMaterial.SetFloat("_CutHeight",floor==0||PlayerControlled?10000:floor*3.3f);}
+    public void SetFloor(int floor){Floor=floor;ApplyFloorCuts();}
     public void SetPlayer(bool enabled)
     {
         if (!player || player.controlled == enabled) return;
@@ -168,7 +189,7 @@ public partial class FullCampus : MonoBehaviour {
             var trip=playerPlaces[room];
             playerPlaces[room]=trips.First(t=>ReferenceEquals(t.seat,trip.seat));
         }
-        running=false;paused=false;next=0;finished=0;frames=0;frameSeconds=0;elapsed=0;
+        running=false;paused=false;next=0;finished=0;eligibleStalls=0;frames=0;frameSeconds=0;elapsed=0;
         message=routeStatus;
     }
     string routeStatus;
@@ -219,7 +240,7 @@ public partial class FullCampus : MonoBehaviour {
         }
     }
     public NavMeshData Bake(){
-        var settings=NavMesh.GetSettingsByID(0);settings.agentRadius=CampusAgentRadius;settings.agentHeight=1.65f;settings.agentClimb=.32f;settings.agentSlope=45;settings.overrideVoxelSize=true;settings.voxelSize=.075f;settings.overrideTileSize=true;settings.tileSize=192;
+        var settings=NavMesh.GetSettingsByID(0);settings.agentRadius=CampusAgentRadius;settings.agentHeight=CampusAgentHeight;settings.agentClimb=CampusAgentClimb;settings.agentSlope=45;settings.overrideVoxelSize=true;settings.voxelSize=.075f;settings.overrideTileSize=true;settings.tileSize=192;
         return UnityEngine.AI.NavMeshBuilder.BuildNavMeshData(settings,sources,bounds,Vector3.zero,Quaternion.identity);
     }
     public string Audit(){
@@ -270,15 +291,134 @@ public partial class FullCampus : MonoBehaviour {
         }
         Debug.Log("Campus: "+summary+" | "+message+" Acceso "+entrance);return summary+"\n"+message;
     }
-    void Spawn(Trip t) => Spawn(t,entrance);
-    void Spawn(Trip t,Vector3 origin){
-        if(t.route==null){finished++;return;}
+    static bool CompletePath(Vector3 from, Vector3 to, NavMeshPath path) =>
+        NavMesh.CalculatePath(from,to,NavMesh.AllAreas,path) && path.status==NavMeshPathStatus.PathComplete;
+
+    void Spawn(Trip t)
+    {
+        if(!buildingOrigins.TryGetValue(t.seat.building,out var origin))
+        {
+            var seats=inventory.seats.Where(seat=>seat.building==t.seat.building);
+            if(!PickLoadOrigin(BuildingOrigins(t.seat.building),seats,out origin))origin=entrance;
+            buildingOrigins[t.seat.building]=origin;
+        }
+        if(!NavMesh.SamplePosition(origin,out var start,.45f,NavMesh.AllAreas))
+        {
+            FinishTrip(t,false);
+            t.routeStatus="sin aparición navegable";
+            return;
+        }
+
+        var local=PlanLocalTrip(t.seat,start.position);
+        if(local==null && t.route!=null)
+        {
+            t.actualRoute=t.route;
+            start.position=entrance;
+        }
+        else t.actualRoute=local?.route;
+
+        t.origin=start.position;
+        if(!exteriorExits.TryGetValue(t.origin,out t.exit))
+        {
+            t.exit=t.origin==entrance||CompletePath(t.origin,entrance,new NavMeshPath())?entrance:t.origin;
+            exteriorExits[t.origin]=t.exit;
+        }
+        if(t.actualRoute!=null)
+        {
+            Spawn(t,t.origin,t.actualRoute[t.actualRoute.Length-1]);
+            return;
+        }
+        Spawn(t,t.origin,t.origin);
+        BeginTour(t);
+    }
+
+    void BeginTour(Trip t)
+    {
+        var from=t.agent.transform.position;
+        t.toured=true;
+        t.retries=0;
+        t.stalled=0;
+        if(!exteriorTours.TryGetValue(t.origin,out var tour))
+        {
+            var points=new List<Vector3>();
+            var path=new NavMeshPath();
+            var candidates=AccessPoints.SelectMany(entry=>entry.Points).Concat(LibraryOrigins)
+                .OrderBy(point=>(point-t.origin).sqrMagnitude);
+            var previous=t.origin;
+            foreach(var candidate in candidates)
+            {
+                if(points.Count==3)break;
+                if(!NavMesh.SamplePosition(candidate,out var nextPoint,.45f,NavMesh.AllAreas) ||
+                   (nextPoint.position-previous).sqrMagnitude<225 ||
+                   !CompletePath(previous,nextPoint.position,path) ||
+                   !CompletePath(nextPoint.position,t.exit,path))continue;
+                previous=nextPoint.position;
+                points.Add(previous);
+            }
+            // A disconnected exterior still allows a short circuit on its own walkable ground.
+            for(int i=0;points.Count<3&&i<12;i++)
+            {
+                var target=t.origin+Quaternion.Euler(0,i*30,0)*Vector3.forward*(i<6?8:4);
+                if(!NavMesh.SamplePosition(target,out var nearby,1f,NavMesh.AllAreas) ||
+                   (nearby.position-previous).sqrMagnitude<9 ||
+                   !CompletePath(previous,nearby.position,path) ||
+                   !CompletePath(nearby.position,t.exit,path))continue;
+                previous=nearby.position;
+                points.Add(previous);
+            }
+            exteriorTours[t.origin]=tour=points.ToArray();
+        }
+        t.tour=tour;
+        t.corner=0;
+        t.phase=6;
+        if(t.tour.Length==0 || !CompletePath(from,t.tour[0],new NavMeshPath()))BeginExit(t);
+        else SetTripDestination(t,t.tour[0]);
+    }
+
+    void BeginExit(Trip t)
+    {
+        var path=new NavMeshPath();
+        var from=t.agent.transform.position;
+        if(!CompletePath(from,t.exit,path) && !CompletePath(from,t.origin,path))
+        {
+            if(!t.relocated || !t.agent.Warp(t.beforeRelocation) ||
+               (!CompletePath(t.beforeRelocation,t.exit,path)&&!CompletePath(t.beforeRelocation,t.origin,path)))
+            {
+                FinishTrip(t,false);
+                return;
+            }
+            from=t.beforeRelocation;
+        }
+        t.phase=3;
+        t.retries=0;
+        t.stalled=0;
+        var corners=path.corners;
+        SetTripDestination(t,corners.Length>0?corners[corners.Length-1]:from);
+    }
+
+    static void SetTripDestination(Trip t,Vector3 target)
+    {
+        t.destination=target;
+        t.agent.SetDestination(target);
+    }
+
+    void FinishTrip(Trip t,bool completed)
+    {
+        t.phase=completed?4:5;
+        t.ended=elapsed;
+        finished++;
+        if(t.agent)Destroy(t.agent.gameObject);
+        if(t.visual)Destroy(t.visual);
+    }
+
+    void Spawn(Trip t,Vector3 origin) => Spawn(t,origin,t.route[t.route.Length-1]);
+    void Spawn(Trip t,Vector3 origin,Vector3 destination){
         var obj=new GameObject(t.seat.role);obj.transform.position=origin;
-        t.agent=obj.AddComponent<NavMeshAgent>();t.agent.radius=CampusAgentRadius;t.agent.height=1.65f;t.agent.speed=1.45f;t.agent.avoidancePriority=20+next%60;
-        t.agent.SetDestination(t.route[t.route.Length-1]);t.phase=1;t.entered=elapsed;
+        t.agent=obj.AddComponent<NavMeshAgent>();t.agent.radius=CampusAgentRadius;t.agent.height=CampusAgentHeight;t.agent.speed=1.45f;t.agent.avoidancePriority=20+next%60;
+        SetTripDestination(t,destination);t.phase=1;t.entered=elapsed;
     }
     void Visual(Trip t,Vector3 p,Vector3? testVelocity=null){
-        bool near=(Floor==0||PlayerControlled||p.y<Floor*3.3f)&&(Camera.main.transform.position-p).sqrMagnitude<12100;
+        bool near=(p.y<=VisibleHeight(p))&&(Camera.main.transform.position-p).sqrMagnitude<12100;
         if(!near){if(t.visual) t.visual.SetActive(false);return;}
         if(!t.visual){
             int k=t.seat.role=="Profesor"?1:t.seat.role=="Administrativo"?2:0;
@@ -311,25 +451,32 @@ public partial class FullCampus : MonoBehaviour {
             return;
         }
         frames++;frameSeconds+=Time.unscaledDeltaTime;elapsed+=Time.deltaTime*rate;
-        while(next<trips.Count&&next<=elapsed*2){Spawn(trips[next]);next++;}
+        while(next<spawnOrder.Length&&next<=elapsed*2){Spawn(spawnOrder[next]);next++;}
         foreach(var t in trips){
-            if(t.phase<1||t.phase>3)continue;
+            if(t.phase<1||(t.phase>3&&t.phase!=6))continue;
             if(t.agent.enabled){t.agent.isStopped=false;t.agent.speed=1.45f*rate;t.agent.acceleration=8*rate;}
             if(t.phase==2){
                 bool teaching=t.seat.role=="Profesor"&&elapsed-t.sat<60;Visual(t,teaching?t.agent.transform.position:t.seat.position);
                 if(elapsed-t.sat<120)continue;
-                t.phase=3;t.left=elapsed;t.agent.enabled=true;t.agent.SetDestination(entrance);
+                t.left=elapsed;t.agent.enabled=true;BeginExit(t);
             }else{
                 if(t.agent.velocity.sqrMagnitude<.001f&&!t.agent.pathPending&&t.agent.remainingDistance>.12f)t.stalled+=Time.deltaTime;else t.stalled=0;
                 if(t.stalled>20||(!t.agent.pathPending&&t.agent.pathStatus!=NavMeshPathStatus.PathComplete)){
                     t.stalled=0;
-                    if(++t.retries<=3)t.agent.SetDestination(t.phase==1?t.route[t.route.Length-1]:entrance);
-                    else{t.phase=5;finished++;Destroy(t.agent.gameObject);if(t.visual)Destroy(t.visual);continue;}
+                    if(++t.retries<=3)SetTripDestination(t,t.destination);
+                    else if(t.phase==1){if(!TryRelocateNearSeat(t))BeginTour(t);}
+                    else if(t.phase==6)BeginExit(t);
+                    else FinishTrip(t,false);
+                    continue;
                 }
                 Visual(t,t.agent.transform.position);t.meters+=t.agent.velocity.magnitude*Time.deltaTime;
                 if(t.agent.pathPending||t.agent.remainingDistance>.12f||float.IsInfinity(t.agent.remainingDistance))continue;
                 if(t.phase==1){t.phase=2;t.sat=elapsed;t.agent.enabled=false;}
-                else{t.phase=4;t.ended=elapsed;finished++;Destroy(t.agent.gameObject);if(t.visual)Destroy(t.visual);}
+                else if(t.phase==6){
+                    t.retries=0;
+                    if(++t.corner<t.tour.Length)SetTripDestination(t,t.tour[t.corner]);
+                    else BeginExit(t);
+                }else FinishTrip(t,true);
             }
         }
         if(finished==trips.Count){running=false;Export();}
@@ -346,8 +493,8 @@ public partial class FullCampus : MonoBehaviour {
     public void Export(){
         string dir=Path.Combine(Application.persistentDataPath,"Campus",DateTime.Now.ToString("yyyyMMdd_HHmmssfff"));Directory.CreateDirectory(dir);
         using(var w=new StreamWriter(Path.Combine(dir,"agentes.csv"),false,new UTF8Encoding(true))){
-            w.WriteLine("id,tipo,edificio,salon,puesto,estado,entrada_s,sentado_s,salida_puesto_s,fin_s,recorrido_m");
-            int id=0;foreach(var t in trips)w.WriteLine(FormattableString.Invariant($"{++id},{Q(t.seat.role)},{Q(t.seat.building)},{Q(t.seat.room)},{Q(t.seat.name)},{(t.route==null?"sin ruta":new[]{"pendiente","ingresando","sentado","saliendo","finalizado","ruta interrumpida"}[t.phase])},{t.entered:F2},{t.sat:F2},{t.left:F2},{t.ended:F2},{t.meters:F2}"));
+            w.WriteLine("id,tipo,edificio,salon,puesto,estado,entrada_s,sentado_s,salida_puesto_s,fin_s,recorrido_m,traslado_por_atasco");
+            int id=0;foreach(var t in trips)w.WriteLine(FormattableString.Invariant($"{++id},{Q(t.seat.role)},{Q(t.seat.building)},{Q(t.seat.room)},{Q(t.seat.name)},{(t.phase==4&&t.toured?"recorrió el campus y salió":new[]{"pendiente","ingresando","sentado","saliendo","finalizado","ruta interrumpida","recorriendo campus"}[t.phase])},{t.entered:F2},{t.sat:F2},{t.left:F2},{t.ended:F2},{t.meters:F2},{(t.relocated?"sí":"no")}"));
         }
         using(var w=new StreamWriter(Path.Combine(dir,"ocupacion.csv"),false,new UTF8Encoding(true))){
             w.WriteLine("salon,capacidad,ocupacion_actual,ocupacion_maxima");
@@ -360,7 +507,7 @@ public partial class FullCampus : MonoBehaviour {
         using(var w=new StreamWriter(Path.Combine(dir,"rutas_planificadas.csv"),false,new UTF8Encoding(true))){
             w.WriteLine("id,punto,x_m,y_m,z_m");
             for(int i=0;i<trips.Count;i++){
-                var route=trips[i].route;if(route==null)continue;
+                var route=trips[i].actualRoute??trips[i].route;if(route==null)continue;
                 for(int j=0;j<route.Length;j++){var p=route[j];w.WriteLine(FormattableString.Invariant($"{i+1},{j},{p.x:F2},{p.y:F2},{p.z:F2}"));}
             }
         }
@@ -369,6 +516,11 @@ public partial class FullCampus : MonoBehaviour {
     }
 }
 }
+
+
+
+
+
 
 
 

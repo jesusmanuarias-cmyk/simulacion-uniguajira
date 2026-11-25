@@ -60,20 +60,20 @@ namespace CampusMonday {
    var floors=new List<string>{"Todos"};
    for(int f=1;f<=campus.MaxFloor;f++)floors.Add("Hasta piso "+f);
    var floor=new DropdownField(floors,0);floor.AddToClassList("speed");
-   floor.tooltip="Corte por altura aproximada. Los niveles varían entre edificios.";
+   floor.tooltip="Corte según la altura de los pisos de cada bloque configurado.";
    floor.RegisterValueChangedCallback(e=>campus.SetFloor(floors.IndexOf(e.newValue)));controls.Add(floor);
    Text(controls,"PRUEBA POR EDIFICIO","eyebrow field-heading");
    var buildings=new DropdownField(campus.BuildingTests(),0);
    buildings.AddToClassList("speed");
    controls.Add(buildings);
    Action(controls,"Probar edificio seleccionado",()=>campus.TestOneBuilding(buildings.value),"primary full");
-   Action(controls,"Reiniciar lunes",campus.Restart,"secondary full");
+   Action(controls,"Reiniciar simulación",campus.Restart,"secondary full");
    Action(controls,"Explorar en tercera persona · TAB",()=>campus.SetPlayer(true),"primary full");
    Action(controls,"Exportar CSV",campus.Export,"quiet");
    Action(controls,"Abrir resultados",campus.OpenResults,"quiet");
    var timeline=Box(overview,"timeline surface");
    var bar=Box(timeline,"row timeline-heading");
-   pause=Action(bar,"Iniciar lunes",campus.ToggleRun,"pause");status=Text(bar,"","status muted");
+   pause=Action(bar,"Comenzar simulación",campus.ToggleRun,"pause");status=Text(bar,"","status muted");
    Text(overview,"Izquierdo arrastra · Rueda acerca · P pausa","camera-hint");
    explore=Box(root,"explore");explore.pickingMode=PickingMode.Ignore;
    var card=Box(explore,"explore-card surface");playerClock=Text(card,"","brand-title");
@@ -90,7 +90,7 @@ namespace CampusMonday {
    clock.text=campus.Clock;playerClock.text="Lunes · "+clock.text;
    playerPrompt.text=campus.PlayerPrompt;
    status.text=campus.Status;status.tooltip=campus.Status;
-   pause.text=campus.Running?(campus.Paused?"Continuar":"Pausar"):"Iniciar lunes";
+   pause.text=campus.Running?(campus.Paused?"Continuar":"Pausar"):"Comenzar simulación";
    playState.text=campus.Running?(campus.Paused?"EN PAUSA":"EN CURSO"):(campus.Started?"FINALIZADO":"LISTO");
   }
   void BuildHeader(){
@@ -147,5 +147,8 @@ namespace CampusMonday {
   void OnDestroy(){if(panel)Destroy(panel);}
  }
 }
+
+
+
 
 

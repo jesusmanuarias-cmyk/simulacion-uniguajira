@@ -51,7 +51,7 @@ namespace CampusMonday {
      {
        airborneTime = 0;
        // Keep a checkpoint well inside the supporting surface.
-       if (Physics.SphereCast(transform.position + Vector3.up * .35f, .14f, Vector3.down,
+       if (Physics.SphereCast(transform.position + Vector3.up * .35f, body.radius*.64f, Vector3.down,
            out var floor, .35f, CampusCollisionMask, QueryTriggerInteraction.Ignore) && floor.normal.y > .7f)
          lastSafeGround = transform.position + Vector3.up * .04f;
        return;
@@ -149,6 +149,7 @@ namespace CampusMonday {
    }
  }
 }
+
 
 
 
