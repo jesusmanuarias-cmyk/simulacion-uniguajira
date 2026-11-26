@@ -28,6 +28,7 @@ namespace CampusMonday
         };
 
         bool checkingLocalAccess;
+        Trip accessTestTrip;
 
         public void TestBuildingAccess()
         {
@@ -81,7 +82,7 @@ namespace CampusMonday
                 }
 
                 focus = origin;
-                zoom = 42;
+                zoom = zoomTarget = 42;
                 MoveCamera();
                 for (int i = 0; i < tests.Length; i++)
                 {
@@ -91,6 +92,7 @@ namespace CampusMonday
                     bool seated = false;
                     if (trip != null)
                     {
+                        accessTestTrip = trip;
                         Spawn(trip, origin);
                         trip.agent.speed = 5;
                         trip.agent.acceleration = 16;
@@ -126,6 +128,7 @@ namespace CampusMonday
                         }
                         Destroy(trip.agent.gameObject);
                         if (trip.visual) Destroy(trip.visual);
+                        accessTestTrip = null;
                     }
                     report.WriteLine(FormattableString.Invariant($"{Q(building)},{i+1},{Q(status)},{Q(trip?.seat.name ?? "")},{origin.x:F3},{origin.y:F3},{origin.z:F3},{meters:F2},{highest:F2},{(seated ? "sí" : "no")}"));
                     report.Flush();
@@ -136,21 +139,42 @@ namespace CampusMonday
             Debug.Log("CAMPUS_ACCESOS_LOCALES_OK " + file);
         }
 
+        static readonly float[] SeatProbeRadii = { .50f, .72f, .28f };
+
+        static readonly float[] DiningSeatProbeRadii = { .50f, .72f, .28f, 1.10f, 1.35f };
+
+        static IEnumerable<Vector3> SeatApproaches(Seat seat)
+        {
+            if(seat.building==ParkingShelters)
+            {
+                var front=seat.position+seat.forward*(seat.name.StartsWith("Fila 2")?.53f:.73f);
+                if(NavMesh.SamplePosition(front,out var approach,.32f,NavMesh.AllAreas) &&
+                   Vector3.Dot(approach.position-seat.position,seat.forward)>.33f)
+                    yield return approach.position;
+                yield break;
+            }
+            var tested = new HashSet<Vector3>();
+            bool dining=seat.role=="Comensal";
+            float maxDistance=dining?1.45f:1.05f;
+            foreach(var radius in dining?DiningSeatProbeRadii:SeatProbeRadii)
+            for (int i = 0; i < 8; i++)
+            {
+                var probe = seat.position + Quaternion.Euler(0, i * 45, 0) * Vector3.forward * radius;
+                if (NavMesh.SamplePosition(probe,out var hit,.5f,NavMesh.AllAreas) &&
+                    Mathf.Abs(hit.position.y-seat.position.y) <= .55f &&
+                    Vector3.ProjectOnPlane(hit.position-seat.position,Vector3.up).sqrMagnitude <= maxDistance*maxDistance &&
+                    tested.Add(hit.position))
+                    yield return hit.position;
+            }
+        }
+
         static Trip PlanLocalTrip(Seat seat, Vector3 origin)
         {
             var path = new NavMeshPath();
-            for (int i = 0; i < 8; i++)
-            {
-                var probe = seat.position + Quaternion.Euler(0, i * 45, 0) * Vector3.forward * .63f;
-                if (!NavMesh.SamplePosition(probe,out var hit,.5f,NavMesh.AllAreas) ||
-                    Mathf.Abs(hit.position.y-seat.position.y) > .55f ||
-                    Vector3.ProjectOnPlane(hit.position-seat.position,Vector3.up).magnitude > 1.05f ||
-                    !NavMesh.CalculatePath(origin,hit.position,NavMesh.AllAreas,path) ||
-                    path.status != NavMeshPathStatus.PathComplete) continue;
-                return new Trip { seat = seat, route = path.corners };
-            }
+            foreach(var approach in SeatApproaches(seat))
+                if (CompletePath(origin,approach,path))
+                    return new Trip { seat = seat, route = path.corners };
             return null;
         }
     }
 }
-

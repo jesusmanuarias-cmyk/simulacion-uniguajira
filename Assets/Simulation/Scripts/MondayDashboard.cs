@@ -42,13 +42,15 @@ namespace CampusMonday {
    initialized=true;
   }
   public void Initialize(FullCampus simulation){
-   campus=simulation;InitializePanel();BuildHeader();
+   campus=simulation;InitializePanel();root.AddToClassList("full-campus");BuildHeader();
    var sidebar=Box(overview,"sidebar surface");
    var heading=Box(sidebar,"panel-heading");
    Text(heading,"Centro de control","section-title");playState=Text(heading,"LISTO","live-state");
    var stats=Box(sidebar,"stats");
-   foreach(var item in new[]{("Estudiante","Estudiantes","student"),("Profesor","Profesores","teacher"),("Administrativo","Administrativos","admin")})
+   foreach(var item in new[]{("Estudiante","Estudiantes","student"),("Profesor","Profesores","teacher"),("Administrativo","Administrativos","admin"),("Comensal","Comensales","student")})
     Stat(stats,item.Item2,item.Item3).text=campus.Capacity(item.Item1).ToString("N0");
+   var bar=Box(sidebar,"tab-content campus-actions");
+   pause=Action(bar,"Comenzar simulación",campus.ToggleRun,"pause");status=Text(bar,"","status muted");
    var scroll=new ScrollView(ScrollViewMode.Vertical);scroll.AddToClassList("panel-scroll");
    scroll.horizontalScrollerVisibility=ScrollerVisibility.Hidden;sidebar.Add(scroll);
    var controls=Box(scroll.contentContainer,"tab-content");
@@ -66,15 +68,27 @@ namespace CampusMonday {
    var buildings=new DropdownField(campus.BuildingTests(),0);
    buildings.AddToClassList("speed");
    controls.Add(buildings);
+   var studentCount=new IntegerField("Estudiantes asignados"){isDelayed=true,tooltip="Se aplica al iniciar una simulación o una prueba."};
+   var seatCapacity=Text(controls,"","muted");
+   controls.Add(studentCount);
+   void UpdateStudentCount(){
+    int count=campus.StudentCapacity(buildings.value);
+    seatCapacity.text=$"Capacidad estudiantil · {count:N0}";
+    studentCount.SetValueWithoutNotify(campus.StudentLimit(buildings.value));
+    studentCount.SetEnabled(count>0);
+   }
+   buildings.RegisterValueChangedCallback(_=>UpdateStudentCount());
+   studentCount.RegisterValueChangedCallback(e=>{campus.SetStudentLimit(buildings.value,e.newValue);UpdateStudentCount();});
+   UpdateStudentCount();
+   var zoomSpeed=new Slider("Velocidad de zoom",.5f,5){value=campus.ZoomSpeed};
+   zoomSpeed.RegisterValueChangedCallback(e=>campus.ZoomSpeed=e.newValue);
+   controls.Add(zoomSpeed);
    Action(controls,"Probar edificio seleccionado",()=>campus.TestOneBuilding(buildings.value),"primary full");
    Action(controls,"Reiniciar simulación",campus.Restart,"secondary full");
    Action(controls,"Explorar en tercera persona · TAB",()=>campus.SetPlayer(true),"primary full");
    Action(controls,"Exportar CSV",campus.Export,"quiet");
    Action(controls,"Abrir resultados",campus.OpenResults,"quiet");
-   var timeline=Box(overview,"timeline surface");
-   var bar=Box(timeline,"row timeline-heading");
-   pause=Action(bar,"Comenzar simulación",campus.ToggleRun,"pause");status=Text(bar,"","status muted");
-   Text(overview,"Izquierdo arrastra · Rueda acerca · P pausa","camera-hint");
+   Text(overview,"Izquierdo desplaza · Derecho o central rota · Rueda acerca · P pausa","camera-hint");
    explore=Box(root,"explore");explore.pickingMode=PickingMode.Ignore;
    var card=Box(explore,"explore-card surface");playerClock=Text(card,"","brand-title");
    Action(card,"Volver a simulación · TAB",()=>campus.SetPlayer(false),"quiet");
@@ -87,15 +101,16 @@ namespace CampusMonday {
    ApplyVisibility();
    root.EnableInClassList("compact",Screen.width/panel.scale<1100);
    root.EnableInClassList("short",Screen.height/panel.scale<760);
-   clock.text=campus.Clock;playerClock.text="Lunes · "+clock.text;
+   playerClock.text="Explorar campus";
    playerPrompt.text=campus.PlayerPrompt;
    status.text=campus.Status;status.tooltip=campus.Status;
    pause.text=campus.Running?(campus.Paused?"Continuar":"Pausar"):"Comenzar simulación";
-   playState.text=campus.Running?(campus.Paused?"EN PAUSA":"EN CURSO"):(campus.Started?"FINALIZADO":"LISTO");
+   pause.SetEnabled(!campus.Testing);
+   playState.text=campus.Testing?"EN PRUEBA":campus.Running?(campus.Paused?"EN PAUSA":"EN CURSO"):(campus.Started?"FINALIZADO":"LISTO");
   }
   void BuildHeader(){
-   var header=Box(overview,"header surface");var brand=Box(header,"row brand");Text(brand,"U","monogram");var names=Box(brand,"brand-text");Text(names,"Campus / Lunes","brand-title");Text(names,"UNIGUAJIRA  ·  SIMULACIÓN ACADÉMICA","eyebrow");
-   var right=Box(header,"row header-right");Text(right,"SEMANA 14","badge");Action(right,"Ocultar · F1",()=>SetInterfaceVisible(false),"visibility-button");var timeBox=Box(right,"header-clock");clock=Text(timeBox,"06:28","clock");Text(timeBox,"LUNES","eyebrow");
+   var header=Box(overview,"header surface");var brand=Box(header,"row brand");Text(brand,"U","monogram");var names=Box(brand,"brand-text");Text(names,"Simulación del campus","brand-title");Text(names,"UNIGUAJIRA  ·  SIMULACIÓN ACADÉMICA","eyebrow");
+   var right=Box(header,"row header-right");Text(right,"SEMANA 14","badge");Action(right,"Ocultar · F1",()=>SetInterfaceVisible(false),"visibility-button");if(campus)return;var timeBox=Box(right,"header-clock");clock=Text(timeBox,"06:28","clock");Text(timeBox,"LUNES","eyebrow");
   }
   void BuildSidebar(){
    var sidebar=Box(overview,"sidebar surface");var heading=Box(sidebar,"panel-heading");Text(heading,"Centro de control","section-title");playState=Text(heading,"EN CURSO","live-state");
@@ -135,7 +150,7 @@ namespace CampusMonday {
    ApplyVisibility();
   }
   void ApplyVisibility(){bool playing=campus?campus.PlayerControlled:sim.player&&sim.player.controlled;overview.style.display=interfaceVisible&&!playing?DisplayStyle.Flex:DisplayStyle.None;explore.style.display=interfaceVisible&&playing?DisplayStyle.Flex:DisplayStyle.None;restoreInterface.style.display=interfaceVisible?DisplayStyle.None:DisplayStyle.Flex;}
-  void Update(){if(!initialized)return;var keyboard=Keyboard.current;if(keyboard!=null&&keyboard.f1Key.wasPressedThisFrame)SetInterfaceVisible(!interfaceVisible);if(!campus&&sim.engine==null)return;if(Time.unscaledTime>=nextRefresh){nextRefresh=Time.unscaledTime+.1f;if(campus)RefreshCampus();else Refresh();}}
+  void Update(){if(!initialized||root==null||overview==null||explore==null||restoreInterface==null)return;var keyboard=Keyboard.current;if(keyboard!=null&&keyboard.f1Key.wasPressedThisFrame)SetInterfaceVisible(!interfaceVisible);if(!campus&&sim.engine==null)return;if(Time.unscaledTime>=nextRefresh){nextRefresh=Time.unscaledTime+.1f;if(campus)RefreshCampus();else Refresh();}}
   void Refresh(){if(sim.engine==null)return;ApplyVisibility();root.EnableInClassList("compact",Screen.width/panel.scale<1100);root.EnableInClassList("short",Screen.height/panel.scale<760);roomButton.text="Aula "+sim.focusRoom;
    string hour=$"{(int)sim.clock/60:00}:{(int)sim.clock%60:00}:{(int)(sim.clock*60)%60:00}";clock.text=hour;playerClock.text="Lunes · "+hour;playerPrompt.text=sim.player?sim.player.InteractionPrompt:"";
    total.text=sim.engine.Count(sim.clock).ToString("N0");students.text=sim.engine.Count(sim.clock,Role.Estudiante).ToString("N0");teachers.text=sim.engine.Count(sim.clock,Role.Profesor).ToString();admins.text=sim.engine.Count(sim.clock,Role.Administrativo).ToString();

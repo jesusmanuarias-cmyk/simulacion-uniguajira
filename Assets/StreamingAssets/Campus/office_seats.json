@@ -1,0 +1,484 @@
+{
+  "seats": [
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-01",
+      "role": "Administrativo",
+      "room": "Oficina IV-01 · piso 2",
+      "position": {
+        "x": -86.286,
+        "y": 3.134,
+        "z": 91.356
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-02",
+      "role": "Administrativo",
+      "room": "Oficina IV-02 · piso 2",
+      "position": {
+        "x": -83.465,
+        "y": 3.134,
+        "z": 91.813
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-03",
+      "role": "Administrativo",
+      "room": "Oficina IV-03 · piso 2",
+      "position": {
+        "x": -80.645,
+        "y": 3.134,
+        "z": 92.27
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-04",
+      "role": "Administrativo",
+      "room": "Oficina IV-04 · piso 2",
+      "position": {
+        "x": -77.754,
+        "y": 3.134,
+        "z": 92.738
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-05",
+      "role": "Administrativo",
+      "room": "Oficina IV-05 · piso 2",
+      "position": {
+        "x": -74.863,
+        "y": 3.134,
+        "z": 93.206
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-06",
+      "role": "Administrativo",
+      "room": "Oficina IV-06 · piso 2",
+      "position": {
+        "x": -72.043,
+        "y": 3.134,
+        "z": 93.663
+      },
+      "forward": {
+        "x": 0.15988118769183485,
+        "y": 0,
+        "z": -0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-07",
+      "role": "Administrativo",
+      "room": "Oficina IV-07 · piso 2",
+      "position": {
+        "x": -87.051,
+        "y": 3.134,
+        "z": 96.08
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-08",
+      "role": "Administrativo",
+      "room": "Oficina IV-08 · piso 2",
+      "position": {
+        "x": -84.23,
+        "y": 3.134,
+        "z": 96.537
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-09",
+      "role": "Administrativo",
+      "room": "Oficina IV-09 · piso 2",
+      "position": {
+        "x": -81.34,
+        "y": 3.134,
+        "z": 97.005
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-10",
+      "role": "Administrativo",
+      "room": "Oficina IV-10 · piso 2",
+      "position": {
+        "x": -78.519,
+        "y": 3.134,
+        "z": 97.462
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-11",
+      "role": "Administrativo",
+      "room": "Oficina IV-11 · piso 2",
+      "position": {
+        "x": -75.628,
+        "y": 3.134,
+        "z": 97.93
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-12",
+      "role": "Administrativo",
+      "room": "Oficina IV-12 · piso 2",
+      "position": {
+        "x": -72.737,
+        "y": 3.134,
+        "z": 98.398
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-13",
+      "role": "Administrativo",
+      "room": "Oficina IV-13 · piso 2",
+      "position": {
+        "x": -69.917,
+        "y": 3.134,
+        "z": 98.855
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloque IV",
+      "name": "Puesto IV-14",
+      "role": "Administrativo",
+      "room": "Oficina IV-14 · piso 2",
+      "position": {
+        "x": -67.049,
+        "y": 3.134,
+        "z": 99.464
+      },
+      "forward": {
+        "x": -0.15988118769183485,
+        "y": 0,
+        "z": 0.9871362650729879
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-01",
+      "role": "Administrativo",
+      "room": "Oficina VII-01 · piso 2",
+      "position": {
+        "x": 160.557,
+        "y": 3.49,
+        "z": -204.547
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-02",
+      "role": "Administrativo",
+      "room": "Oficina VII-02 · piso 2",
+      "position": {
+        "x": 155.899,
+        "y": 3.49,
+        "z": -203.826
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-03",
+      "role": "Administrativo",
+      "room": "Oficina VII-03 · piso 2",
+      "position": {
+        "x": 151.169,
+        "y": 3.49,
+        "z": -203.094
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-04",
+      "role": "Administrativo",
+      "room": "Oficina VII-04 · piso 2",
+      "position": {
+        "x": 146.44,
+        "y": 3.49,
+        "z": -202.361
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-05",
+      "role": "Administrativo",
+      "room": "Oficina VII-05 · piso 2",
+      "position": {
+        "x": 141.781,
+        "y": 3.49,
+        "z": -201.64
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-06",
+      "role": "Administrativo",
+      "room": "Oficina VII-06 · piso 2",
+      "position": {
+        "x": 137.052,
+        "y": 3.49,
+        "z": -200.908
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-07",
+      "role": "Administrativo",
+      "room": "Oficina VII-07 · piso 2",
+      "position": {
+        "x": 132.393,
+        "y": 3.49,
+        "z": -200.187
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VII-08",
+      "role": "Administrativo",
+      "room": "Oficina VII-08 · piso 2",
+      "position": {
+        "x": 128.511,
+        "y": 3.49,
+        "z": -199.586
+      },
+      "forward": {
+        "x": -0.9882283814465528,
+        "y": 0,
+        "z": 0.1529858362840381
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-01",
+      "role": "Administrativo",
+      "room": "Oficina VIII-01 · piso 2",
+      "position": {
+        "x": 156.864,
+        "y": 3.47,
+        "z": -239.55
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-02",
+      "role": "Administrativo",
+      "room": "Oficina VIII-02 · piso 2",
+      "position": {
+        "x": 152.202,
+        "y": 3.47,
+        "z": -238.853
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-03",
+      "role": "Administrativo",
+      "room": "Oficina VIII-03 · piso 2",
+      "position": {
+        "x": 147.469,
+        "y": 3.47,
+        "z": -238.145
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-04",
+      "role": "Administrativo",
+      "room": "Oficina VIII-04 · piso 2",
+      "position": {
+        "x": 142.736,
+        "y": 3.47,
+        "z": -237.438
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-05",
+      "role": "Administrativo",
+      "room": "Oficina VIII-05 · piso 2",
+      "position": {
+        "x": 138.073,
+        "y": 3.47,
+        "z": -236.741
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-06",
+      "role": "Administrativo",
+      "room": "Oficina VIII-06 · piso 2",
+      "position": {
+        "x": 133.34,
+        "y": 3.47,
+        "z": -236.034
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-07",
+      "role": "Administrativo",
+      "room": "Oficina VIII-07 · piso 2",
+      "position": {
+        "x": 128.607,
+        "y": 3.47,
+        "z": -235.326
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    },
+    {
+      "building": "Bloques VII y VIII · oficinas",
+      "name": "Puesto VIII-08",
+      "role": "Administrativo",
+      "room": "Oficina VIII-08 · piso 2",
+      "position": {
+        "x": 124.792,
+        "y": 3.47,
+        "z": -234.756
+      },
+      "forward": {
+        "x": -0.9890158633619168,
+        "y": 0,
+        "z": 0.14780941112961055
+      }
+    }
+  ]
+}

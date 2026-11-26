@@ -18,6 +18,8 @@ namespace CampusMonday
         {
             public Seat Seat;
             public Trip Display;
+            public int Priority;
+            public float PlannedLength;
             public Vector3 Origin, Target, Position, ProgressPoint, Approach;
             public bool HasApproach;
             public NavMeshAgent Agent;
@@ -54,9 +56,9 @@ namespace CampusMonday
         static readonly (string Building, Vector3 Origin, Vector3[] Targets)[] VisitorBuildings =
         {
             ("Bloque IV", new(-77,0,130), new Vector3[]{new(-78,0,103),new(-60,3.1f,91),new(-60,6.2f,91)}),
-            ("Bienestar Universitario", new(59,0,174), new Vector3[]{new(58,.4f,159),new(56,.4f,166)}),
+            (WelfareBuilding, new(59,0,174), new Vector3[]{new(58,.4f,159),new(56,.4f,166)}),
             ("Casa Verde", new(-45,0,151), new Vector3[]{new(-44,.4f,146),new(-43,.4f,148)}),
-            ("Centro Recreacional y Comedor", new(-318,0,-172), new Vector3[]{new(-306,.02f,-197),new(-334,.02f,-198)}),
+            (DiningHallBuilding, new(-318,0,-172), new Vector3[]{new(-306,.02f,-197),new(-334,.02f,-198)}),
             ("SILAB y Herbarios", new(120,.3f,-65), new Vector3[]{new(100,.34f,-85),new(119,.34f,-104),new(139,.94f,-88)}),
             ("Estadio, canchas y coliseo", new(-94,.2f,-166), new Vector3[]{new(-109,.2f,-186),new(-66,.2f,-92)}),
             ("Recursos Físicos", new(81,.5f,115), new Vector3[]{new(81,.49f,107),new(81,3.69f,101)}),
@@ -108,21 +110,22 @@ namespace CampusMonday
 
         IEnumerator ObserveFullCapacity(string buildingFilter, bool focused = false, bool singleBuilding = false, bool reportRoutes = false)
         {
-            Restart();
+            ResetSimulation();
             checkingLocalAccess = true;
             SetPlayer(false);
             SetFloor(0);
 
-            var selection = reportRoutes ? BuildingTests().SelectMany(BuildingDestinations).ToArray() : singleBuilding ? BuildingDestinations(buildingFilter) : focused
+            var selection = reportRoutes ? BuildingTests().SelectMany(BuildingDestinations).ToArray() : singleBuilding ? SelectPopulation(BuildingDestinations(buildingFilter),seat=>seat).ToArray() : focused
                 ? inventory.seats.Where(seat => seat.building == MainAdministration).Concat(LibraryDestinations()).ToArray()
                 : inventory.seats.Where(seat => buildingFilter == null || seat.building == buildingFilter).ToArray();
             var queues = new List<Queue<LoadPerson>>();
             bool followFirst = buildingFilter != null || focused;
             foreach (var building in selection.GroupBy(seat => seat.building))
             {
-                var points = BuildingOrigins(building.Key);
+                bool local = singleBuilding || focused || buildingFilter != null || reportRoutes;
+                var points = local ? LocalTestOrigins(building.Key, building) : BuildingOrigins(building.Key);
                 bool hasOrigin = PickLoadOrigin(points, building, out var origin);
-                if (!hasOrigin && NavMesh.SamplePosition(entrance, out var gate, 1f, NavMesh.AllAreas))
+                if (!local && !hasOrigin && building.Key != DiningHallBuilding && NavMesh.SamplePosition(entrance, out var gate, 1f, NavMesh.AllAreas))
                 {
                     hasOrigin = true;
                     origin = gate.position;
@@ -130,38 +133,58 @@ namespace CampusMonday
                 if (hasOrigin && followFirst)
                 {
                     focus = origin;
-                    zoom = 58;
+                    zoom = zoomTarget = 58;
                     MoveCamera();
                     followFirst = false;
                 }
-                var queue = new Queue<LoadPerson>();
-                var inspectionLanes = hasOrigin ? LoadLanes(origin) : Array.Empty<Vector3>();
-                int idleIndex = 0;
+                var origins = CandidateOrigins(points).Where(p => p != origin).Prepend(origin).ToArray();
+                var planned = new List<LoadPerson>();
                 foreach (var seat in building)
                 {
                     var person = new LoadPerson { Seat = seat, Origin = origin, Position = origin, Target = origin };
+                    person.Priority = 20 + loadPeople.Count % 60;
                     loadPeople.Add(person);
-                    if (hasOrigin) PlanLoadPerson(person);
-                    else person.State = LoadState.NoSpawn;
-                    if (person.State == LoadState.Waiting) queue.Enqueue(person);
-                    else if (hasOrigin && singleBuilding)
+                    if (hasOrigin)
                     {
-                        person.Position = inspectionLanes[idleIndex++ % inspectionLanes.Length];
-                        person.Display = new Trip { seat = seat };
+                        PlanLoadPerson(person);
+                        if (!person.CompletePlan || UsesDistributedAccess(seat.building))
+                        {
+                            float bestLength = person.CompletePlan ? person.PlannedLength : float.PositiveInfinity;
+                            foreach(var alternate in origins.Skip(1))
+                            {
+                                var route = PlanLocalTrip(seat,alternate);
+                                if(route == null)continue;
+                                float length = RouteLength(route.route);
+                                if(length >= bestLength)continue;
+                                bestLength = length;
+                                person.Origin = person.Position = alternate;
+                                person.Target = person.Approach = route.route[route.route.Length-1];
+                                person.HasApproach = person.CompletePlan = true;
+                                person.State = LoadState.Waiting;
+                            }
+                        }
                     }
+                    else person.State = LoadState.NoSpawn;
+                    if (person.State == LoadState.Waiting) planned.Add(person);
                     if (loadPeople.Count % 24 == 0)
                     {
                         message = $"Asignando puestos · {loadPeople.Count}/{selection.Length}";
                         yield return null;
                     }
                 }
-                queues.Add(queue);
+                foreach(var group in planned.GroupBy(person => person.Origin))
+                {
+                    var staggered = group.GroupBy(person => person.Seat.room)
+                        .SelectMany(room => room.Select((person,index)=>(person,index)))
+                        .OrderBy(item => item.index).Select(item => item.person);
+                    queues.Add(new Queue<LoadPerson>(staggered));
+                }
             }
 
             var active = new List<LoadPerson>();
             float nextReport = 0;
             var laneStarts = queues.Select(q => q.Count == 0 ? Array.Empty<Vector3>() : LoadLanes(q.Peek().Origin)).ToArray();
-            var releaseAt = laneStarts.Select(lanes => new float[lanes.Length]).ToArray();
+            var releaseAt = new float[queues.Count];
 
             do
             {
@@ -170,11 +193,12 @@ namespace CampusMonday
                 {
                     for (int lane = 0; lane < laneStarts[b].Length && queues[b].Count > 0 && active.Count < 384; lane++)
                     {
-                        if (now < releaseAt[b][lane]) continue;
+                        if (now < releaseAt[b] || active.Any(person =>
+                            (person.Position-laneStarts[b][lane]).sqrMagnitude < .36f)) continue;
                         var person = queues[b].Dequeue();
                         ReleaseLoadPerson(person, laneStarts[b][lane], now);
                         if (person.State == LoadState.Walking) active.Add(person);
-                        releaseAt[b][lane] = now + .38f;
+                        releaseAt[b] = now + .55f;
                     }
                 }
 
@@ -192,12 +216,12 @@ namespace CampusMonday
                     }
                     if (!agent.pathPending && Vector3.Distance(position, person.Target) <= .30f)
                         person.State = person.CompletePlan ? LoadState.Arrived : LoadState.Partial;
-                    else if (now - person.LastProgress > 15)
+                    else if (now - person.LastProgress > 30)
                         person.State = LoadState.Stalled;
                     else if (now - person.ReleasedAt > 210)
                         person.State = LoadState.TimedOut;
                     if (person.State == LoadState.Walking) continue;
-                    if(reportRoutes && person.Seat.role != "Visitante de prueba" && person.HasApproach &&
+                    if((reportRoutes || singleBuilding) && person.Seat.role != "Visitante de prueba" && person.Seat.role != "Comensal" && person.Seat.building != ParkingShelters && person.HasApproach &&
                        (person.State == LoadState.Stalled || person.State == LoadState.Partial))
                     {
                         person.Display.agent = agent;
@@ -234,8 +258,22 @@ namespace CampusMonday
             Debug.Log(message);
         }
 
-        static Vector3[] BuildingOrigins(string building)
+        const string WelfareBuilding = "Bienestar Universitario";
+        const string DiningHallBuilding = "Centro Recreacional y Comedor";
+        static readonly Vector3[] DiningRoadOrigins =
         {
+            new(-132,-.2f,-104), new(-133,-.2f,-107), new(-134,-.2f,-110)
+        };
+
+        Vector3[] BuildingOrigins(string building)
+        {
+            if (building == ParkingShelters) return ParkingOrigins();
+            if (building == SharedOfficeBuilding)
+                return BuildingOrigins("Bloque VII").Concat(BuildingOrigins("Bloque VIII")).ToArray();
+            if (building == WelfareBuilding) return new[]{entrance};
+            if (building == DiningHallBuilding)
+                return DiningRoadOrigins.Select(point =>
+                    NavMesh.SamplePosition(point,out var hit,3f,NavMesh.AllAreas) ? hit.position : point).ToArray();
             var points = building == LibraryBuilding ? LibraryOrigins
                     : AccessPoints.FirstOrDefault(entry => entry.Building == building).Points;
             if (points == null && building == "Bloque VII")
@@ -250,19 +288,65 @@ namespace CampusMonday
             return points;
         }
 
+        Vector3[] LocalTestOrigins(string building, IEnumerable<Seat> seats)
+        {
+            var configured = building == WelfareBuilding ? new[] { VisitorBuildings.First(entry => entry.Building == building).Origin }
+                : BuildingOrigins(building) ?? Array.Empty<Vector3>();
+            var candidates = new List<Vector3>();
+            if (building == "Bloque IV")
+                configured = configured.Concat(new Vector3[] { new(-77,-.18f,132), new(-64,-.18f,125), new(-88,-.18f,123) }).ToArray();
+            foreach (var point in configured)
+                if (NavMesh.SamplePosition(point, out var hit, 4f, NavMesh.AllAreas) && Mathf.Abs(hit.position.y - point.y) < 1.3f)
+                    candidates.Add(hit.position);
+
+            if (candidates.Count == 0 || building == "Bloque IV")
+            {
+                var positions = seats.Select(seat => seat.position).ToArray();
+                var lowest = positions.Min(point => point.y);
+                var ground = positions.Where(point => point.y < lowest + .7f).ToArray();
+                var center = ground.Aggregate(Vector3.zero, (sum, point) => sum + point) / ground.Length;
+                var radius = ground.Max(point => Vector2.Distance(new Vector2(point.x, point.z), new Vector2(center.x, center.z)));
+                for (int i = 0; i < 12; i++)
+                {
+                    var angle = i * Mathf.PI / 6;
+                    var point = center + new Vector3(Mathf.Cos(angle), 0, Mathf.Sin(angle)) * (radius + 3f);
+                    if (NavMesh.SamplePosition(point, out var hit, 5f, NavMesh.AllAreas) && Mathf.Abs(hit.position.y - lowest) < 1.3f)
+                        candidates.Add(hit.position);
+                }
+            }
+            return candidates.Distinct().ToArray();
+        }
+
+        static bool UsesDistributedAccess(string building) =>
+            building == "Bloque VI" || building == "Bloque VII" || building == "Bloque VIII" || building == SharedOfficeBuilding;
+
+        static float RouteLength(Vector3[] corners)
+        {
+            float length = 0;
+            for(int i=1;i<corners.Length;i++)length += Vector3.Distance(corners[i-1],corners[i]);
+            return length;
+        }
+
+        static IEnumerable<Vector3> CandidateOrigins(Vector3[] points)
+        {
+            foreach(var point in points ?? Array.Empty<Vector3>())
+                if(NavMesh.SamplePosition(point,out var hit,.38f,NavMesh.AllAreas))
+                    yield return hit.position;
+        }
+
         static bool PickLoadOrigin(Vector3[] points, IEnumerable<Seat> seats, out Vector3 origin)
         {
             origin = points?.FirstOrDefault() ?? Vector3.zero;
             if (points == null) return false;
             int best = -1;
-            foreach (var point in points)
+            var sample = seats.GroupBy(seat => Mathf.RoundToInt(seat.position.y))
+                .SelectMany(floor => floor.OrderBy(seat => seat.room).Where((seat,i) => i % Mathf.Max(1,floor.Count()/8) == 0).Take(8)).ToArray();
+            foreach (var candidate in CandidateOrigins(points))
             {
-                if (!NavMesh.SamplePosition(point, out var hit, .38f, NavMesh.AllAreas)) continue;
-                var sample = seats.OrderBy(s => (s.position-hit.position).sqrMagnitude).Take(16);
-                int score = sample.Count(s => PlanLocalTrip(s, hit.position) != null);
+                int score = sample.Count(s => PlanLocalTrip(s, candidate) != null);
                 if (score <= best) continue;
                 best = score;
-                origin = hit.position;
+                origin = candidate;
             }
             return best >= 0;
         }
@@ -273,35 +357,29 @@ namespace CampusMonday
             var path = new NavMeshPath();
             float bestRemaining = float.PositiveInfinity;
             bool hasApproach = false;
-            foreach (float radius in new[] { .50f, .72f })
+            foreach(var approach in SeatApproaches(seat))
             {
-                for (int direction = 0; direction < 8; direction++)
+                hasApproach = true;
+                if (!NavMesh.CalculatePath(person.Origin, approach, NavMesh.AllAreas, path)) continue;
+                if (path.status == NavMeshPathStatus.PathComplete)
                 {
-                    var probe = seat.position + Quaternion.Euler(0, direction * 45, 0) * Vector3.forward * radius;
-                    if (!NavMesh.SamplePosition(probe, out var hit, .50f, NavMesh.AllAreas) ||
-                        Mathf.Abs(hit.position.y - seat.position.y) > .55f ||
-                        Vector3.ProjectOnPlane(hit.position - seat.position, Vector3.up).magnitude > 1.05f) continue;
-                    hasApproach = true;
-                    if (!NavMesh.CalculatePath(person.Origin, hit.position, NavMesh.AllAreas, path)) continue;
-                    if (path.status == NavMeshPathStatus.PathComplete)
-                    {
-                        person.Target = hit.position;
-                        person.Approach = hit.position;
-                        person.HasApproach = true;
-                        person.CompletePlan = true;
-                        return;
-                    }
-
-                    var corners = path.corners;
-                    if (corners.Length < 2) continue;
-                    var end = corners[corners.Length - 1];
-                    float remaining = (hit.position - end).sqrMagnitude;
-                    if (remaining >= bestRemaining || (person.Origin - end).sqrMagnitude < .25f) continue;
-                    bestRemaining = remaining;
-                    person.Target = end;
-                    person.Approach = hit.position;
+                    person.Target = approach;
+                    person.Approach = approach;
                     person.HasApproach = true;
+                    person.CompletePlan = true;
+                    person.PlannedLength = RouteLength(path.corners);
+                    return;
                 }
+
+                var corners = path.corners;
+                if (corners.Length < 2) continue;
+                var end = corners[corners.Length - 1];
+                float remaining = (approach - end).sqrMagnitude;
+                if (remaining >= bestRemaining || (person.Origin - end).sqrMagnitude < .25f) continue;
+                bestRemaining = remaining;
+                person.Target = end;
+                person.Approach = approach;
+                person.HasApproach = true;
             }
             if (!hasApproach) person.State = LoadState.NoApproach;
             else if (float.IsPositiveInfinity(bestRemaining)) person.State = LoadState.NoRoute;
@@ -329,7 +407,7 @@ namespace CampusMonday
             agent.height = CampusAgentHeight;
             agent.speed = 3.5f;
             agent.acceleration = 10;
-            agent.avoidancePriority = 20 + (int)(origin.sqrMagnitude % 60);
+            agent.avoidancePriority = person.Priority;
             agent.stoppingDistance = .12f;
             person.State = LoadState.Walking;
             person.Position = origin;

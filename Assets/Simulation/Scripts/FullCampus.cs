@@ -23,6 +23,7 @@ public partial class FullCampus : MonoBehaviour {
     const float PlayerStep=.32f;
     const float PlayerFootOffset=.015f;
     class Trip {
+        public bool hasWalked;
         public Seat seat;
         public Vector3[] actualRoute, tour;
         public Vector3 origin, exit, destination;
@@ -144,6 +145,7 @@ public partial class FullCampus : MonoBehaviour {
     public bool PlayerControlled=>player&&player.controlled;
     public bool PointerOverControls=>dashboard&&dashboard.PointerOverControls;
     public bool Running=>running;
+    public bool Testing=>checkingLocalAccess;
     public bool Paused=>paused;
     public bool Started=>elapsed>0||running;
     public string Status=>message;
@@ -153,12 +155,30 @@ public partial class FullCampus : MonoBehaviour {
     public int MaxFloor=>FloorCuts.Max(block=>block.Cuts.Length);
     public int Capacity(string role)=>capacity.TryGetValue(role,out int count)?count:0;
     Dictionary<string,int> capacity;
+    readonly Dictionary<string,int> studentLimits = new();
+    public float ZoomSpeed { get; set; } = 2.5f;
+    public int StudentCapacity(string building) => inventory.seats.Count(s=>s.building==building && s.role=="Estudiante");
+    public int StudentLimit(string building) => studentLimits.TryGetValue(building,out int value)
+        ? value : (StudentCapacity(building)+2)/3;
+    public void SetStudentLimit(string building,int value) =>
+        studentLimits[building]=Mathf.Clamp(value,0,StudentCapacity(building));
+    IEnumerable<T> SelectPopulation<T>(IEnumerable<T> items, System.Func<T, Seat> seatOf)
+    {
+        foreach(var building in items.GroupBy(item=>seatOf(item).building))
+        {
+            foreach(var item in building.Where(item=>seatOf(item).role!="Estudiante"))yield return item;
+            var students=building.Where(item=>seatOf(item).role=="Estudiante")
+                .OrderBy(item=>seatOf(item).room).ThenBy(item=>seatOf(item).position.y).ToArray();
+            int count=Mathf.Min(StudentLimit(building.Key),students.Length);
+            for(int i=0;i<count;i++)yield return students[(int)(((long)(2*i+1)*students.Length)/(2L*count))];
+        }
+    }
     public void ToggleRun(){
         if(checkingLocalAccess)return;
         if(running){paused=!paused;return;}
         if(Started)Restart();
         else ClearLoadPeople();
-        spawnOrder=trips.GroupBy(t=>t.seat.building)
+        spawnOrder=SelectPopulation(trips,t=>t.seat).GroupBy(t=>t.seat.building)
             .SelectMany(group=>group.Select((trip,index)=>(trip,index)))
             .OrderBy(item=>item.index).Select(item=>item.trip).ToArray();
         running=true;
@@ -177,7 +197,16 @@ public partial class FullCampus : MonoBehaviour {
         SetFloor(Floor);
     }
     public void Restart(){
-        if(checkingLocalAccess)return;
+        StopAllCoroutines();
+        checkingLocalAccess=false;
+        if(accessTestTrip!=null){
+            if(accessTestTrip.agent){accessTestTrip.agent.enabled=false;Destroy(accessTestTrip.agent.gameObject);}
+            if(accessTestTrip.visual)Destroy(accessTestTrip.visual);
+            accessTestTrip=null;
+        }
+        ResetSimulation();
+    }
+    void ResetSimulation(){
         ClearLoadPeople();
         for(int i=0;i<trips.Count;i++){
             var trip=trips[i];
@@ -189,7 +218,7 @@ public partial class FullCampus : MonoBehaviour {
             var trip=playerPlaces[room];
             playerPlaces[room]=trips.First(t=>ReferenceEquals(t.seat,trip.seat));
         }
-        running=false;paused=false;next=0;finished=0;eligibleStalls=0;frames=0;frameSeconds=0;elapsed=0;
+        spawnOrder=null;running=false;paused=false;next=0;finished=0;eligibleStalls=0;frames=0;frameSeconds=0;elapsed=0;
         message=routeStatus;
     }
     string routeStatus;
@@ -197,12 +226,17 @@ public partial class FullCampus : MonoBehaviour {
         string dir=Path.Combine(Application.persistentDataPath,"Campus");
         Directory.CreateDirectory(dir);Application.OpenURL(new Uri(dir).AbsoluteUri);
     }
-    float elapsed,orbit=35,zoom=85;
+    float elapsed,orbit=35,pitch=55,zoom=85,zoomTarget=85;
     Vector3 focus;
     static string Folder=>Path.Combine(Application.streamingAssetsPath,"Campus");
-    void Start(){LoadMap();if(!baked)baked=Bake();if(baked)nav=NavMesh.AddNavMeshData(baked);LoadThresholdLinks();Audit();CreatePlayer();focus=entrance;Camera.main.farClipPlane=2200;MoveCamera();dashboard=gameObject.AddComponent<MondayDashboard>();dashboard.Initialize(this);}
+    void Start(){LoadMap();if(!baked)baked=Bake();if(baked)nav=NavMesh.AddNavMeshData(baked);LoadThresholdLinks();InstallReservoirObstacles();Audit();CreatePlayer();focus=entrance;Camera.main.farClipPlane=2200;MoveCamera();dashboard=gameObject.AddComponent<MondayDashboard>();dashboard.Initialize(this);}
     public void LoadMap(bool preview=false, bool navigationOnly=false){
         inventory=JsonUtility.FromJson<Inventory>(File.ReadAllText(Path.Combine(Folder,"capacity.json")));
+        LoadOffices();
+        AddParkingSeats();
+        var diningFile=Path.Combine(Folder,"dining_seats.json");
+        if(File.Exists(diningFile))
+            inventory.seats=inventory.seats.Concat(JsonUtility.FromJson<Inventory>(File.ReadAllText(diningFile)).seats).ToArray();
         mapMaterial=new Material(campusShader);var material=mapMaterial;
         using(var reader=new BinaryReader(new GZipStream(File.OpenRead(Path.Combine(Folder,"campus.gz")),CompressionMode.Decompress))){
             int count=reader.ReadInt32();
@@ -210,13 +244,21 @@ public partial class FullCampus : MonoBehaviour {
             for(int i=0;i<count;i++){
                 var group=new GameObject("Sector "+i);group.transform.SetParent(transform);
                 var levels=new LOD[2];
+                bool keepStairDetail=false;
                 for(int level=0;level<2;level++){
                 int vertices=reader.ReadInt32(),indices=reader.ReadInt32();bool solid=reader.ReadBoolean();
-                if((preview&&level==0&&!solid)||(navigationOnly&&!solid)){
+                if((navigationOnly&&!solid)||(level==1&&keepStairDetail)){
                     SkipGeometry(reader,vertices*16L+indices*4L);
                     continue;
                 }
-                var points=MemoryMarshal.Cast<byte,Vector3>(reader.ReadBytes(vertices*12)).ToArray();
+                var pointBytes=reader.ReadBytes(vertices*12);
+                var positions=MemoryMarshal.Cast<byte,Vector3>(pointBytes);
+                if(level==0&&!navigationOnly)keepStairDetail=ContainsDetailedStairs(positions);
+                if(preview&&level==0&&!solid&&!keepStairDetail){
+                    SkipGeometry(reader,vertices*4L+indices*4L);
+                    continue;
+                }
+                var points=positions.ToArray();
                 var colors=MemoryMarshal.Cast<byte,Color32>(reader.ReadBytes(vertices*4)).ToArray();
                 var triangles=MemoryMarshal.Cast<byte,int>(reader.ReadBytes(indices*4)).ToArray();
                 var mesh=new Mesh{indexFormat=vertices>65535?IndexFormat.UInt32:IndexFormat.UInt16};
@@ -226,10 +268,26 @@ public partial class FullCampus : MonoBehaviour {
                 if(!hasBounds){bounds=mesh.bounds;hasBounds=true;}else bounds.Encapsulate(mesh.bounds);
                 levels[level]=new LOD(level==0?.06f:.00001f,new[]{tile.GetComponent<Renderer>()});if(solid&&!preview)solidTiles.Add(tile.GetComponent<MeshFilter>());if(solid&&!preview)sources.Add(new NavMeshBuildSource{shape=NavMeshBuildSourceShape.Mesh,sourceObject=mesh,transform=Matrix4x4.identity});
                 }
-                if(navigationOnly)continue;
+                if(navigationOnly||keepStairDetail)continue;
                 var lod=group.AddComponent<LODGroup>();lod.SetLODs(levels[0].renderers==null?new[]{new LOD(.00001f,levels[1].renderers)}:levels);lod.RecalculateBounds();
             }
         }
+        if(!navigationOnly){DrawReservoirs();DrawOffices();DrawParkingFurniture(preview);}
+    }
+    // Keep narrow handrail parts and curved treads at the original render resolution.
+    static bool ContainsDetailedStairs(ReadOnlySpan<Vector3> points)
+    {
+        foreach(var p in points)
+        {
+            if(p.y < -.9f || p.y > 12f)continue;
+            if((p.x>=-92 && p.x<=-84 && p.z>=99 && p.z<=107) ||
+               (p.x>=-72 && p.x<=-64 && p.z>=102 && p.z<=111) ||
+               (p.x>=-161 && p.x<=-153 && p.z>=142 && p.z<=152) ||
+               (p.x>=-139 && p.x<=-130 && p.z>=128 && p.z<=139) ||
+               (p.x>=-102 && p.x<=-92 && p.z>=230 && p.z<=240) ||
+               (p.x>=-82 && p.x<=-72 && p.z>=213 && p.z<=223))return true;
+        }
+        return false;
     }
     static void SkipGeometry(BinaryReader reader,long bytes){
         var buffer=new byte[65536];
@@ -253,6 +311,19 @@ public partial class FullCampus : MonoBehaviour {
             var trip=new Trip{seat=seat,routeStatus=gate?"sin aproximación en el piso":"portería fuera de NavMesh"};
             trips.Add(trip);
             if(!gate)continue;
+            if(seat.building==ParkingShelters)
+            {
+                foreach(var origin in CandidateOrigins(ParkingOrigins()))
+                {
+                    var local=PlanLocalTrip(seat,origin);
+                    if(local==null)continue;
+                    trip.route=local.route;
+                    trip.routeStatus="ruta completa desde el parqueadero";
+                    break;
+                }
+                continue;
+            }
+            if(seat.building==DiningHallBuilding){trip.routeStatus="acceso junto a la carretera";continue;}
             var facing=Vector3.ProjectOnPlane(seat.forward,Vector3.up).normalized;
             if(facing.sqrMagnitude<.01f)facing=Vector3.forward;
             var right=Vector3.Cross(Vector3.up,facing);
@@ -299,7 +370,7 @@ public partial class FullCampus : MonoBehaviour {
         if(!buildingOrigins.TryGetValue(t.seat.building,out var origin))
         {
             var seats=inventory.seats.Where(seat=>seat.building==t.seat.building);
-            if(!PickLoadOrigin(BuildingOrigins(t.seat.building),seats,out origin))origin=entrance;
+            if(!PickLoadOrigin(BuildingOrigins(t.seat.building),seats,out origin) && t.seat.building!=DiningHallBuilding)origin=entrance;
             buildingOrigins[t.seat.building]=origin;
         }
         if(!NavMesh.SamplePosition(origin,out var start,.45f,NavMesh.AllAreas))
@@ -310,7 +381,22 @@ public partial class FullCampus : MonoBehaviour {
         }
 
         var local=PlanLocalTrip(t.seat,start.position);
-        if(local==null && t.route!=null)
+        if(local==null||UsesDistributedAccess(t.seat.building))
+        {
+            float shortest=local==null?float.PositiveInfinity:RouteLength(local.route);
+            foreach(var alternate in CandidateOrigins(BuildingOrigins(t.seat.building)))
+            {
+                if(alternate==start.position)continue;
+                var alternative=PlanLocalTrip(t.seat,alternate);
+                if(alternative==null)continue;
+                float distance=RouteLength(alternative.route);
+                if(distance>=shortest)continue;
+                shortest=distance;
+                local=alternative;
+                start.position=alternate;
+            }
+        }
+        if(local==null && t.route!=null && t.seat.building!=DiningHallBuilding && t.seat.building!=ParkingShelters)
         {
             t.actualRoute=t.route;
             start.position=entrance;
@@ -320,7 +406,7 @@ public partial class FullCampus : MonoBehaviour {
         t.origin=start.position;
         if(!exteriorExits.TryGetValue(t.origin,out t.exit))
         {
-            t.exit=t.origin==entrance||CompletePath(t.origin,entrance,new NavMeshPath())?entrance:t.origin;
+            t.exit=t.seat.building!=DiningHallBuilding && (t.origin==entrance||CompletePath(t.origin,entrance,new NavMeshPath()))?entrance:t.origin;
             exteriorExits[t.origin]=t.exit;
         }
         if(t.actualRoute!=null)
@@ -418,6 +504,9 @@ public partial class FullCampus : MonoBehaviour {
         SetTripDestination(t,destination);t.phase=1;t.entered=elapsed;
     }
     void Visual(Trip t,Vector3 p,Vector3? testVelocity=null){
+        var velocity=testVelocity??t.agent.velocity;
+        t.hasWalked |= velocity.sqrMagnitude > .0025f;
+        if(!t.hasWalked)return;
         bool near=(p.y<=VisibleHeight(p))&&(Camera.main.transform.position-p).sqrMagnitude<12100;
         if(!near){if(t.visual) t.visual.SetActive(false);return;}
         if(!t.visual){
@@ -430,7 +519,6 @@ public partial class FullCampus : MonoBehaviour {
             t.animator=t.visual.GetComponent<Animator>();t.animator.runtimeAnimatorController=animations;t.animator.applyRootMotion=false;
         }
         t.visual.SetActive(true);t.visual.transform.position=p+t.visual.transform.rotation*t.visualOffset;
-        var velocity=testVelocity??t.agent.velocity;
         var direction=t.phase==2?t.seat.forward:velocity;
         direction.y=0;if(direction.sqrMagnitude>.001f)t.visual.transform.rotation=Quaternion.LookRotation(direction);
         string state=t.phase==2?(t.seat.role=="Profesor"&&elapsed-t.sat<60?"Idle":"Seated"):velocity.sqrMagnitude>.05f?"Walk":"Idle";
@@ -443,7 +531,18 @@ public partial class FullCampus : MonoBehaviour {
         if(keys!=null&&keys.tabKey.wasPressedThisFrame)SetPlayer(!PlayerControlled);
         if(!player.controlled&&mouse!=null){
             if(mouse.leftButton.isPressed&&!PointerOverControls){var d=mouse.delta.ReadValue();var yaw=Quaternion.Euler(0,orbit,0);focus+=yaw*new Vector3(-d.x,0,-d.y)*zoom*.0014f;}
-            zoom=Mathf.Clamp(zoom-mouse.scroll.ReadValue().y*.08f,5,1000);MoveCamera();
+            if(!PointerOverControls)
+            {
+                var drag=mouse.delta.ReadValue();
+                if(mouse.rightButton.isPressed||mouse.middleButton.isPressed)
+                {
+                    orbit+=drag.x*.22f;
+                    pitch=Mathf.Clamp(pitch-drag.y*.16f,20,85);
+                }
+                zoomTarget=Mathf.Clamp(zoomTarget*Mathf.Exp(-mouse.scroll.ReadValue().y*.0008f*ZoomSpeed),5,1000);
+            }
+            zoom=Mathf.Lerp(zoom,zoomTarget,1-Mathf.Exp(-14*Time.unscaledDeltaTime));
+            MoveCamera();
         }
         if(!running)return;
                 if(paused){
@@ -464,7 +563,7 @@ public partial class FullCampus : MonoBehaviour {
                 if(t.stalled>20||(!t.agent.pathPending&&t.agent.pathStatus!=NavMeshPathStatus.PathComplete)){
                     t.stalled=0;
                     if(++t.retries<=3)SetTripDestination(t,t.destination);
-                    else if(t.phase==1){if(!TryRelocateNearSeat(t))BeginTour(t);}
+                    else if(t.phase==1){if(t.seat.building==ParkingShelters||t.seat.role=="Comensal"||!TryRelocateNearSeat(t))BeginTour(t);}
                     else if(t.phase==6)BeginExit(t);
                     else FinishTrip(t,false);
                     continue;
@@ -479,9 +578,9 @@ public partial class FullCampus : MonoBehaviour {
                 }else FinishTrip(t,true);
             }
         }
-        if(finished==trips.Count){running=false;Export();}
+        if(finished==spawnOrder.Length){running=false;Export();}
     }
-    void MoveCamera(){var camera=Camera.main;if(!camera)return;camera.transform.rotation=Quaternion.Euler(55,orbit,0);camera.transform.position=focus-camera.transform.forward*zoom;}
+    void MoveCamera(){var camera=Camera.main;if(!camera)return;camera.transform.rotation=Quaternion.Euler(pitch,orbit,0);camera.transform.position=focus-camera.transform.forward*zoom;}
     public void RemoveThresholdLinks()
     {
         foreach(var link in thresholdLinks)
@@ -494,7 +593,7 @@ public partial class FullCampus : MonoBehaviour {
         string dir=Path.Combine(Application.persistentDataPath,"Campus",DateTime.Now.ToString("yyyyMMdd_HHmmssfff"));Directory.CreateDirectory(dir);
         using(var w=new StreamWriter(Path.Combine(dir,"agentes.csv"),false,new UTF8Encoding(true))){
             w.WriteLine("id,tipo,edificio,salon,puesto,estado,entrada_s,sentado_s,salida_puesto_s,fin_s,recorrido_m,traslado_por_atasco");
-            int id=0;foreach(var t in trips)w.WriteLine(FormattableString.Invariant($"{++id},{Q(t.seat.role)},{Q(t.seat.building)},{Q(t.seat.room)},{Q(t.seat.name)},{(t.phase==4&&t.toured?"recorrió el campus y salió":new[]{"pendiente","ingresando","sentado","saliendo","finalizado","ruta interrumpida","recorriendo campus"}[t.phase])},{t.entered:F2},{t.sat:F2},{t.left:F2},{t.ended:F2},{t.meters:F2},{(t.relocated?"sí":"no")}"));
+            int id=0;foreach(var t in spawnOrder??trips.ToArray())w.WriteLine(FormattableString.Invariant($"{++id},{Q(t.seat.role)},{Q(t.seat.building)},{Q(t.seat.room)},{Q(t.seat.name)},{(t.phase==4&&t.toured?"recorrió el campus y salió":new[]{"pendiente","ingresando","sentado","saliendo","finalizado","ruta interrumpida","recorriendo campus"}[t.phase])},{t.entered:F2},{t.sat:F2},{t.left:F2},{t.ended:F2},{t.meters:F2},{(t.relocated?"sí":"no")}"));
         }
         using(var w=new StreamWriter(Path.Combine(dir,"ocupacion.csv"),false,new UTF8Encoding(true))){
             w.WriteLine("salon,capacidad,ocupacion_actual,ocupacion_maxima");
@@ -506,8 +605,9 @@ public partial class FullCampus : MonoBehaviour {
         }
         using(var w=new StreamWriter(Path.Combine(dir,"rutas_planificadas.csv"),false,new UTF8Encoding(true))){
             w.WriteLine("id,punto,x_m,y_m,z_m");
-            for(int i=0;i<trips.Count;i++){
-                var route=trips[i].actualRoute??trips[i].route;if(route==null)continue;
+            var exported=spawnOrder??trips.ToArray();
+            for(int i=0;i<exported.Length;i++){
+                var route=exported[i].actualRoute??exported[i].route;if(route==null)continue;
                 for(int j=0;j<route.Length;j++){var p=route[j];w.WriteLine(FormattableString.Invariant($"{i+1},{j},{p.x:F2},{p.y:F2},{p.z:F2}"));}
             }
         }

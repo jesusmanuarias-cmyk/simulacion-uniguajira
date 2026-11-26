@@ -112,3 +112,14 @@ Button:focus { border-color: rgb(103, 222, 197); }
 .short .speed { margin-top: 6px; margin-bottom: 6px; }
 
 
+
+.full-campus .camera-hint { bottom: 24px; }
+.full-campus .campus-actions { flex-shrink: 0; }
+.full-campus .campus-actions .status { display: flex; height: 23px; margin: 4px 0 0 0; -unity-text-align: middle-left; }
+.full-campus .unity-base-field__label { color: rgb(186, 207, 229); min-width: 105px; }
+.full-campus .unity-base-text-field__input {
+    background-color: rgb(25, 38, 57);
+    border-color: rgb(52, 70, 94);
+    color: rgb(230, 239, 249);
+    -unity-selection-color: rgb(44, 92, 116);
+}
